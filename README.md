@@ -82,6 +82,7 @@ mlx-community/whisper-medium-mlx
 mlx-community/whisper-large-v3-mlx
 mlx-community/whisper-large-v3-turbo
 mlx-community/distil-whisper-large-v3
+mlx-community/whisper-medium.en-mlx
 - `--language en`：指定英语
 可选
 {af,am,ar,as,az,ba,be,bg,bn,bo,br,bs,ca,cs,cy,da,de,el,en,es,et,eu,fa,fi,fo,fr,gl,gu,ha,haw,he,hi,hr,ht,hu,hy,id,is,it,ja,jw,ka,kk,km,kn,ko,la,lb,ln,lo,lt,lv,mg,mi,mk,ml,mn,mr,ms,mt,my,ne,nl,nn,no,oc,pa,pl,ps,pt,ro,ru,sa,sd,si,sk,sl,sn,so,sq,sr,su,sv,sw,ta,te,tg,th,tk,tl,tr,tt,uk,ur,uz,vi,yi,yo,yue,zh,Afrikaans,Albanian,Amharic,Arabic,Armenian,Assamese,Azerbaijani,Bashkir,Basque,Belarusian,Bengali,Bosnian,Breton,Bulgarian,Burmese,Cantonese,Castilian,Catalan,Chinese,Croatian,Czech,Danish,Dutch,English,Estonian,Faroese,Finnish,Flemish,French,Galician,Georgian,German,Greek,Gujarati,Haitian,Haitian Creole,Hausa,Hawaiian,Hebrew,Hindi,Hungarian,Icelandic,Indonesian,Italian,Japanese,Javanese,Kannada,Kazakh,Khmer,Korean,Lao,Latin,Latvian,Letzeburgesch,Lingala,Lithuanian,Luxembourgish,Macedonian,Malagasy,Malay,Malayalam,Maltese,Mandarin,Maori,Marathi,Moldavian,Moldovan,Mongolian,Myanmar,Nepali,Norwegian,Nynorsk,Occitan,Panjabi,Pashto,Persian,Polish,Portuguese,Punjabi,Pushto,Romanian,Russian,Sanskrit,Serbian,Shona,Sindhi,Sinhala,Sinhalese,Slovak,Slovenian,Somali,Spanish,Sundanese,Swahili,Swedish,Tagalog,Tajik,Tamil,Tatar,Telugu,Thai,Tibetan,Turkish,Turkmen,Ukrainian,Urdu,Uzbek,Valencian,Vietnamese,Welsh,Yiddish,Yoruba}
@@ -128,7 +129,38 @@ mlx_whisper '你的视频或音频路径' \
 
 ---
 
-## 7. 完全删除环境（不影响系统）
+## 7. 防重复幻觉参数（batchWhisper.sh 已启用）
+
+Whisper 模型在遇到静音、背景噪音或低音量段落时，容易产生**重复幻觉**（repetition hallucination），
+表现为字幕中连续出现多行完全相同的内容，例如：
+
+```
+[44:01.080 --> 44:02.080]  Mmm.
+[44:02.080 --> 44:03.080]  Mmm.
+[44:03.080 --> 44:04.080]  Mmm.
+```
+
+`batchWhisper.sh` 中已启用以下三个参数来抑制此问题：
+
+| 参数 | 当前值 | 作用 |
+|---|---|---|
+| `--condition-on-previous-text` | `False` | **最关键**。关闭后，模型在解码下一个时间窗口时不再依赖上一窗口的输出，直接切断重复循环的根源。副作用：可能导致相邻窗口之间的文本衔接不够连贯，但不会丢失内容。 |
+| `--compression-ratio-threshold` | `2.4` | Whisper 会计算每段输出的 gzip 压缩比，如果内容高度重复（如连续相同的词），压缩比会异常低，触发此阈值后该段结果会被丢弃。正常语音内容不受影响。 |
+| `--hallucination-silence-threshold` | `30` | 当静音段超过 30 秒时，模型不再为其生成字幕内容，避免在长静音段产生幻觉。正常对话中的短暂停顿不受影响。 |
+
+### 未启用的参数及原因
+
+| 参数 | 说明 |
+|---|---|
+| `--no-speech-threshold` | 控制“无语音”判定阈值（默认 0.6）。提高该值可过滤更多静音段，但**可能误伤轻声细语**，因此当前未启用。如需进一步抑制重复，可手动添加 `--no-speech-threshold 0.6`；若发现轻声内容被漏掉，可降低至 `0.4`。 |
+
+### 如何完全关闭防重复参数
+
+如果某些视频内容特殊（如诗歌朗诵、歌词等），重复内容本身是合理的，可以在 `batchWhisper.sh` 中删除或注释掉对应的参数行即可。
+
+---
+
+## 8. 完全删除环境（不影响系统）
 
 ```bash
 rm -rf ~/whisper-isolated
