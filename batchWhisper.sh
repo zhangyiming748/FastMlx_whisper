@@ -16,13 +16,16 @@ find "$TARGET_DIR" -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.wav"
     output_name="$(basename "$file")"
     output_name="${output_name%.*}"
 
+    # 输出目录为该文件所在目录，保证字幕与源文件保持相同目录层级
+    output_dir="$(dirname "$file")"
+
     # 3. 执行 mlx_whisper 命令
     # 将当前文件路径作为第一个参数传入
     mlx_whisper "$file" \
       --model mlx-community/whisper-large-v3-mlx \
       --language en \
       --output-format srt \
-      --output-dir "$TARGET_DIR" \
+      --output-dir "$output_dir" \
       --output-name "$output_name" \
       --condition-on-previous-text False \
       --compression-ratio-threshold 2.4 \
