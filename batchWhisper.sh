@@ -23,7 +23,7 @@ find "$TARGET_DIR" -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.wav"
     # 将当前文件路径作为第一个参数传入
     mlx_whisper "$file" \
       --model mlx-community/whisper-large-v3-mlx \
-      --language en \
+      --language ja \
       --output-format srt \
       --output-dir "$output_dir" \
       --output-name "$output_name" \
