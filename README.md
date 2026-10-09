@@ -1,5 +1,5 @@
 ```shell
-SRC="/path/to/src"; DST="/path/to/dst"; cd "$SRC" && find . -type d -exec mkdir -p "$DST/{}" \; && find . -name '*.srt' -exec cp {} "$DST/{}" \;
+SRC="/path/to/src"; DST="/Users/zen/github/TraditionTranslate/srt"; cd "$SRC" && find . -type d -exec mkdir -p "$DST/{}" \; && find . -name '*.srt' -exec cp {} "$DST/{}" \;
 ```
 # FastMlx_whisper
 批量使用针对Apple Silicon优化的 whisper
