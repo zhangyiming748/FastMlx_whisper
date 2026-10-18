@@ -27,10 +27,39 @@
 # 指定要处理的目录，默认为当前目录
 TARGET_DIR="${1:-.}"
 
-# 初始提示词：只作用于第一个 30 秒窗口，用来"定调"（文体、专用词、语气词写法）。
-# 模型会模仿这段话的语言和标点风格，所以用日语写、并明确要求保留语气词和长音。
-# 如果是特定系列电影，可在这里加入人名/专有名词的正确写法，例如「主人公：田中」。
-INITIAL_PROMPT="日本語の映画の会話です。あいづちや感動詞（あー、うーん、ええと、ん等）や、伸ばす発音も省略せずそのまま文字起こししてください。"
+# ============================================================================
+# 语言开关 —— 换语言只改这一处（或运行时用第 2 个参数临时指定），无需再动其他地方。
+#   de = 德语   es = 西班牙语   en = 英语   ja = 日语
+# 例：
+#   ./batchWhisper.sh                # 用下面默认语言处理当前目录
+#   ./batchWhisper.sh /movies ja     # 临时用日语处理 /movies
+#   ./batchWhisper.sh . en           # 临时用英语处理当前目录
+LANG_CODE="${2:-de}"
+#
+# 下面按 LANG_CODE 自动选用"用该语言本身书写"的初始提示词。
+# 初始提示词只作用于第一个 30 秒窗口，用来"定调"（文体、标点风格、语气词写法）。
+# Whisper 会模仿这段话的语言和标点风格，所以每种语言都用母语书写，
+# 并统一要求：电影对白、逐字完整转写、保留填充词/语气词/拉长发音、不省略。
+# 若是特定系列电影，可在对应分支里追加人名/专有名词的正确写法。
+case "$LANG_CODE" in
+    de) # 德语
+        INITIAL_PROMPT="Dies ist ein Dialog aus einem deutschen Film. Bitte transkribieren Sie alles wörtlich und vollständig. Lassen Sie keine Füllwörter oder Interjektionen weg (z. B. äh, ähm, na ja, also, hmm) und auch keine gedehnten Laute (z. B. ahhh, oooch). Verwenden Sie natürliche deutsche Satzzeichen."
+        ;;
+    es) # 西班牙语
+        INITIAL_PROMPT="Es un diálogo de una película en español. Transcríbalo todo de forma literal y completa. No omita muletillas ni interjecciones (por ejemplo, este, bueno, o sea, em, eh, mmm) ni sonidos alargados (por ejemplo, ahhh, nooo). Use signos de puntuación naturales del español, incluidos ¿ y ¡."
+        ;;
+    en) # 英语
+        INITIAL_PROMPT="This is dialogue from an English-language film. Please transcribe everything verbatim and completely. Do not omit filler words or interjections (e.g. um, uh, like, you know, hmm) or drawn-out sounds (e.g. ahhh, nooo). Use natural English punctuation."
+        ;;
+    ja) # 日语
+        INITIAL_PROMPT="日本語の映画の会話です。あいづちや感動詞（あー、うーん、ええと、ん等）や、伸ばす発音も省略せずそのまま文字起こししてください。句点や読点など自然な日本語の句読点を使ってください。"
+        ;;
+    *)
+        echo "❌ 不支持的语言代码: '$LANG_CODE'（可选：de 德语 / es 西班牙语 / en 英语 / ja 日语）" >&2
+        exit 1
+        ;;
+esac
+echo "语言开关 LANG_CODE=${LANG_CODE}，已自动选用对应初始提示词。"
 
 # find 查找指定目录及所有子目录下的 .mp4 / .mkv / .wav 文件
 # -type f 仅匹配普通文件；-iname 忽略大小写
@@ -56,9 +85,56 @@ find "$TARGET_DIR" -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.wav"
         # 嫌慢可换 mlx-community/whisper-large-v3-turbo（快很多，精度略低）。
         --model mlx-community/whisper-large-v3-mlx
 
-        # 【语言】强制指定日语，跳过自动检测。电影背景音复杂时自动检测偶尔会
-        # 误判成中文/英语，固定 ja 可避免整盘字幕语言漂移。
-        --language ja
+        # 【语言】强制指定源语言，跳过自动检测。这里引用顶部的开关 $LANG_CODE，
+        # 与初始提示词自动保持一致，不要再手动改这一行，改顶部 LANG_CODE 即可。
+        # 参数值为 ISO-639-1 小写两字母代码；电影背景音复杂时自动检测偶尔会误判，
+        # 固定语言可避免整盘字幕语言漂移。
+        #
+        # 常用语言代码（Whisper 共支持 99 种，这是高频子集）：
+        #   de=德语   ja=日语   en=英语   zh=中文   fr=法语   es=西班牙语
+        #   ru=俄语   ko=韩语   it=意大利语  pt=葡萄牙语  nl=荷兰语
+        #   ar=阿拉伯语  hi=印地语  tr=土耳其语  pl=波兰语   sv=瑞典语
+        #   fi=芬兰语  da=丹麦语  no=挪威语(nn=新挪威语) cs=捷克语  el=希腊语
+        #   he=希伯来语  hu=匈牙利语  id=印尼语  th=泰语    uk=乌克兰语
+        #   vi=越南语  ro=罗马尼亚语 ca=加泰罗尼亚语
+        #
+        # 全部 99 种语言代码（按代码字母排序，代码 = 英文名称）：
+        #   af=afrikaans        am=amharic          ar=arabic
+        #   as=assamese         az=azerbaijani      ba=bashkir
+        #   be=belarusian       bg=bulgarian        bn=bengali
+        #   bo=tibetan          br=breton           bs=bosnian
+        #   ca=catalan          cs=czech            cy=welsh
+        #   da=danish           de=german           el=greek
+        #   en=english          es=spanish          et=estonian
+        #   eu=basque           fa=persian          fi=finnish
+        #   fo=faroese          fr=french           gl=galician
+        #   gu=gujarati         ha=hausa            haw=hawaiian
+        #   he=hebrew           hi=hindi            hr=croatian
+        #   ht=haitian creole   hu=hungarian        hy=armenian
+        #   id=indonesian       is=icelandic        it=italian
+        #   ja=japanese         jw=javanese         ka=georgian
+        #   kk=kazakh           km=khmer            kn=kannada
+        #   ko=korean           la=latin            lb=luxembourgish
+        #   ln=lingala          lo=lao              lt=lithuanian
+        #   lv=latvian          mg=malagasy         mi=maori
+        #   mk=macedonian       ml=malayalam        mn=mongolian
+        #   mr=marathi          ms=malay            mt=maltese
+        #   my=myanmar          ne=nepali           nl=dutch
+        #   nn=nynorsk          no=norwegian        oc=occitan
+        #   pa=punjabi          pl=polish           ps=pashto
+        #   pt=portuguese       ro=romanian         ru=russian
+        #   sa=sanskrit         sd=sindhi           si=sinhala
+        #   sk=slovak           sl=slovenian        sn=shona
+        #   so=somali           sq=albanian         sr=serbian
+        #   su=sundanese        sv=swedish          sw=swahili
+        #   ta=tamil            te=telugu           tg=tajik
+        #   th=thai             tk=turkmen          tl=tagalog
+        #   tr=turkish          tt=tatar            uk=ukrainian
+        #   ur=urdu             uz=uzbek            vi=vietnamese
+        #   yi=yiddish          yo=yoruba           zh=chinese
+        #
+        # 提示：这里固定使用顶部 $LANG_CODE 指定的语言；电影背景音复杂，不建议自动检测。
+        --language "$LANG_CODE"
 
         # 【任务】transcribe = 原文转写（日语进日语出）。
         # 另一个值 translate 会把任何语言翻译成英语，且往往丢掉语气词，电影字幕不要用。
@@ -84,13 +160,23 @@ find "$TARGET_DIR" -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.wav"
         # ③ 代价是速度略慢。日语的"词"按短语切分，偶尔偏粗，属正常现象。
         --word-timestamps True
 
-        # 【字幕排版】每条字幕最多两行、每行最多 14 个全角字符
-        # （日本地上波电视剧字幕的常见规范约 12～16 字 / 行）。
-        # 前提是 word-timestamps=True；max-line-count 必须搭配 max-line-width 才生效。
-        # 若发现长句完全不换行，是因为日语一整句被模型切成了单个"词"，
-        # 可把宽度调小（如 12）多给断行机会。
-        --max-line-width 14
-        --max-line-count 2
+        # 【字幕排版：强制"一个时间轴只有一行"，绝不出现双行/多行】
+        # max-line-count 1 是关键：一条字幕最多 1 行。
+        #   - 旧写法 count=2 时，超过宽度的内容会被插入换行符 "\n" 挤成同一条
+        #     字幕里的第二行 → 表现为"同一时间轴出现双行字幕"。
+        #   - 改成 1 之后，超宽内容不会再塞进同一行，而是按词级时间戳拆成
+        #     "下一条独立字幕"（拥有自己的起止时间轴），从根上杜绝多行。
+        #
+        # max-line-width 此时的含义 = 单条字幕的最大字符数（超出就拆成下一条）。
+        #   日语可取 12～16；德语复合词长、句子长，14 会切得过碎导致字幕频繁跳动，
+        #   建议 30～42（一行能容纳一个较完整的短句）。
+        #
+        # 前提：必须 word-timestamps=True，否则这两个参数都不生效
+        # （不生效时整条 segment 直接输出，可能很长，由播放器自行视觉折行）。
+        # 注意：width 只控制"写入的换行/拆条"，某条仍超过屏幕宽度时播放器可能
+        # 自行视觉折行，那是播放器行为；想更保险就把这个值再调小。
+        # --max-line-width 40
+        --max-line-count 1
 
         # 【初始提示词】见文件顶部 INITIAL_PROMPT 的说明。
         --initial-prompt "$INITIAL_PROMPT"
