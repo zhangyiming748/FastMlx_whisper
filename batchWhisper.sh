@@ -29,11 +29,11 @@ TARGET_DIR="${1:-.}"
 
 # ============================================================================
 # 语言开关 —— 换语言只改这一处（或运行时用第 2 个参数临时指定），无需再动其他地方。
-#   de = 德语   es = 西班牙语   en = 英语   ja = 日语
+#   de = 德语   es = 西班牙语   en = 英语   yue = 粤语   ja = 日语
 # 例：
 #   ./batchWhisper.sh                # 用下面默认语言处理当前目录
 #   ./batchWhisper.sh /movies ja     # 临时用日语处理 /movies
-#   ./batchWhisper.sh . en           # 临时用英语处理当前目录
+#   ./batchWhisper.sh . yue          # 临时用粤语处理当前目录
 LANG_CODE="${2:-de}"
 #
 # 下面按 LANG_CODE 自动选用"用该语言本身书写"的初始提示词。
@@ -51,11 +51,17 @@ case "$LANG_CODE" in
     en) # 英语
         INITIAL_PROMPT="This is dialogue from an English-language film. Please transcribe everything verbatim and completely. Do not omit filler words or interjections (e.g. um, uh, like, you know, hmm) or drawn-out sounds (e.g. ahhh, nooo). Use natural English punctuation."
         ;;
+    yue) # 粤语（广东话 / Cantonese）
+        # Whisper 的粤语代码是 yue（不是 zh）。提示词用繁体粤语口语书写，
+        # 引导模型输出「嘅、咗、喺、唔、嘞」等粤语口语文本，而不是书面普通话；
+        # 不写这句的话，模型有时会把粤语自动"翻译"成规范书面语，丢掉口语味。
+        INITIAL_PROMPT="呢套係粵語電影嘅對白。請逐字完整轉寫，保留粵語口語用字（嘅、咗、喺、唔、嘞、囉等），唔好省略語氣詞同感嘆詞（啊、呀、㗎、咩、喎、啩、吓、嗯、呃），亦都唔好省略拉長嘅發音。請用繁體中文同自然標點符號。"
+        ;;
     ja) # 日语
         INITIAL_PROMPT="日本語の映画の会話です。あいづちや感動詞（あー、うーん、ええと、ん等）や、伸ばす発音も省略せずそのまま文字起こししてください。句点や読点など自然な日本語の句読点を使ってください。"
         ;;
     *)
-        echo "❌ 不支持的语言代码: '$LANG_CODE'（可选：de 德语 / es 西班牙语 / en 英语 / ja 日语）" >&2
+        echo "❌ 不支持的语言代码: '$LANG_CODE'（可选：de 德语 / es 西班牙语 / en 英语 / yue 粤语 / ja 日语）" >&2
         exit 1
         ;;
 esac
@@ -91,8 +97,8 @@ find "$TARGET_DIR" -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.wav"
         # 固定语言可避免整盘字幕语言漂移。
         #
         # 常用语言代码（Whisper 共支持 99 种，这是高频子集）：
-        #   de=德语   ja=日语   en=英语   zh=中文   fr=法语   es=西班牙语
-        #   ru=俄语   ko=韩语   it=意大利语  pt=葡萄牙语  nl=荷兰语
+        #   de=德语   ja=日语   en=英语   zh=中文(普通话)  yue=粤语  fr=法语
+        #   es=西班牙语  ru=俄语   ko=韩语   it=意大利语  pt=葡萄牙语  nl=荷兰语
         #   ar=阿拉伯语  hi=印地语  tr=土耳其语  pl=波兰语   sv=瑞典语
         #   fi=芬兰语  da=丹麦语  no=挪威语(nn=新挪威语) cs=捷克语  el=希腊语
         #   he=希伯来语  hu=匈牙利语  id=印尼语  th=泰语    uk=乌克兰语
@@ -131,7 +137,8 @@ find "$TARGET_DIR" -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.wav"
         #   th=thai             tk=turkmen          tl=tagalog
         #   tr=turkish          tt=tatar            uk=ukrainian
         #   ur=urdu             uz=uzbek            vi=vietnamese
-        #   yi=yiddish          yo=yoruba           zh=chinese
+        #   yi=yiddish          yo=yoruba           yue=cantonese(粤语)
+        #   zh=chinese(普通话)
         #
         # 提示：这里固定使用顶部 $LANG_CODE 指定的语言；电影背景音复杂，不建议自动检测。
         --language "$LANG_CODE"
