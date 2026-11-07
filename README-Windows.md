@@ -360,6 +360,31 @@ Remove-Item -Recurse -Force .venv
 .\install-windows.ps1
 ```
 
+### Q7. Windows 需要像 Linux/macOS 那样 `source` 激活虚拟环境吗？
+
+不需要，原因有两层：
+
+1. `activate` 并没有真的“进入”某个环境，它只是修改**当前 shell** 的环境变量：把 `.venv\Scripts` 放到 `PATH` 最前面、设置 `VIRTUAL_ENV`。Linux/macOS 的 `source` 是把脚本放进当前 shell 里执行，所以这些改动才能保留。
+2. Windows 也有同样的脚本，但必须用**点号**（点 sourcing）执行：
+
+```powershell
+. .\.venv\Scripts\Activate.ps1
+```
+
+如果直接执行 `.\Activate.ps1`，它会在子进程里修改环境，脚本结束就失效——这也是很多人觉得 Windows 上“激活没生效”的原因。cmd 里对应的是 `.venv\Scripts\activate.bat`。
+
+本项目不需要激活，是因为 `install-windows.ps1` 和 `batchWhisper.ps1` 都用**绝对路径**直接调用
+`.venv\Scripts\` 下的程序，只在当前进程里临时追加 CUDA 目录到 `PATH`。
+这样既不会受当前 shell 影响，也不会和系统里其他 Python 版本冲突。
+
+确实想进交互式环境时：
+
+```powershell
+. .\.venv\Scripts\Activate.ps1
+python --version      # 显示 .venv 里的版本
+deactivate            # 退出
+```
+
 ---
 
 ## 11. 卸载 / 清理
