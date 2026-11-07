@@ -1,2 +1,9 @@
 .idea
 .DS_Store
+.venv
+venv
+__pycache__
+*.srt
+*.wav
+*.mp4
+*.mkv

@@ -179,3 +179,78 @@ rm -rf ~/.cache/huggingface
 
 **当前正在运行的命令如果没有加 `--output-format srt`，生成的是 txt。**  
 等它跑完后，直接用上面第 4 步的完整命令重新跑一次即可得到 SRT 文件。
+
+---
+
+# Windows 迁移可行性调研
+
+> 本节内容写于 `Windows` 分支，供评估是否把整套功能迁移到 Windows 平台。当前 `master` 分支没有改动。
+> **实际安装与使用步骤见 [README-Windows.md](README-Windows.md)**（面向不熟悉 Python 的读者）。
+
+## 1. 核心结论
+
+**原生 Windows 无法直接运行当前基于 `mlx-whisper` 的实现**，因为 `mlx` / `mlx-metal` 是 Apple Silicon + Metal 专用框架，PyPI 上没有 Windows wheel。但迁移本身是可行的——只要**把后端从 MLX 换成支持 Windows 的 Whisper 推理引擎**，并配套改写 `batchWhisper.sh`。
+
+## 2. 按硬件场景的方案
+
+### 场景 A：Windows + NVIDIA 显卡 + CUDA
+
+| 方案 | 优势 | 劣势 | 推荐度 |
+|---|---|---|---|
+| **`faster-whisper` / `whisper-ctranslate2`** | 原生支持 Windows CUDA/CPU；比 OpenAI Whisper 快约 4 倍；显存占用更低 | 需要 CUDA 12 + cuBLAS/cuDNN 9；部分参数与 `mlx_whisper` 不完全一致 | ⭐⭐⭐ 首选 |
+| **`openai-whisper` + PyTorch CUDA** | 命令行参数最接近 `mlx_whisper` | Windows 没有 `triton` 加速，速度慢、显存占用高 | ⭐⭐ 次选 |
+
+- `whisper-ctranslate2` 是基于 `faster-whisper` 的 CLI 封装，接口刻意兼容 OpenAI Whisper，是替换 `mlx_whisper` 的较平滑选择。
+
+### 场景 B：Windows 只有 CPU
+
+| 方案 | 优势 | 劣势 | 推荐度 |
+|---|---|---|---|
+| **`faster-whisper` CPU（INT8）** | 原生 Windows；CPU 上明显快于 OpenAI Whisper | 大模型在 CPU 上仍较慢 | ⭐⭐⭐ 首选 |
+| **`whisper.cpp` 独立可执行文件** | CPU 上速度最快、资源占用最低；已有 Windows 二进制 | CLI 参数差异大，脚本需重写 | ⭐⭐ 高性能首选 |
+| **`openai-whisper` CPU** | 改动最小 | 纯 CPU 非常慢，不适合批量 | ⭐ 保底 |
+
+## 3. 如果继续迁移，需要改动的地方
+
+1. **`requirements.txt`**
+   - 删除：`mlx`、`mlx-metal`、`mlx-whisper`
+   - 新增：根据方案选择 `faster-whisper` / `whisper-ctranslate2` / `openai-whisper` + 对应 `torch`
+
+2. **`batchWhisper.sh` → `batchWhisper.ps1` 或 `.bat`**
+   - 替换 `find`、`basename`、`dirname`、`case` 等 bash 语法
+   - 处理 Windows 路径和带空格文件名
+
+3. **CLI 命令**
+   - `mlx_whisper` 改成 `whisper` 或 `whisper-ctranslate2`
+   - 模型名从 `mlx-community/whisper-*.mlx` 改成原始模型名，例如 `large-v3`、`distil-large-v3`
+
+4. **参数差异**
+   - 大部分参数（`--language`、`--output-format`、`--word-timestamps`、`--condition-on-previous-text`、`--compression-ratio-threshold` 等）通用。
+   - `mlx_whisper` 的 `--output-name` 在 OpenAI / `whisper-ctranslate2` 中**不存在**，需要脚本输出到临时目录后再重命名。
+   - 布尔值写法可能不同（`True/False` vs `true/false` 或无需值）。
+
+5. **`ffmpeg`**
+   - Windows 下用 winget、choco 或静态二进制安装，并加入 PATH，替代 `brew install ffmpeg`。
+
+6. **模型下载**
+   - `openai-whisper` 默认从 OpenAI CDN 下载，可能不再需要 HuggingFace Token。
+   - `faster-whisper` 可用 HuggingFace 模型名或本地路径。
+
+## 4. 备选：WSL2 保留 MLX
+
+如果坚持保留 `mlx-whisper`，理论上可以在 **WSL2** 里通过 Linux 版 MLX（CUDA 或 CPU 后端）运行。但这不属于原生 Windows，会引入文件路径、GPU 透传和性能额外复杂度，**不建议作为主力方案**。
+
+## 5. 推荐路径
+
+- **最小改动 + NVIDIA/CPU 都覆盖**：用 `whisper-ctranslate2` 替换 `mlx-whisper`。
+- **CPU 极限性能**：考虑 `whisper.cpp` 的 Windows 二进制，但脚本要重写。
+- **保留 MLX 生态**：只能走 WSL2，不推荐。
+
+## 6. 已实现的 Windows 版本
+
+方案已落地并实测通过（GPU / CPU 两种模式），安装与使用步骤见：
+
+👉 **[Windows 使用手册（README-Windows.md）](README-Windows.md)**
+
+对应脚本为 [batchWhisper.ps1](batchWhisper.ps1)。
+
