@@ -139,22 +139,37 @@ D:\Movies\movie01.srt   ← 生成的字幕
 Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
-### 2. 首次下载模型很慢 / 卡住
+### 2. 报错 `SSLError` / `UNEXPECTED_EOF_WHILE_READING`（下载模型时连不上 huggingface.co）
 
-国内网络可在运行前设置镜像（只对当前窗口有效，重开窗口需重新设置）：
+脚本已默认改用国内镜像 `hf-mirror.com`，并让相关域名绕过系统代理，通常无需手动处理。
+如果仍然出现该报错：
+
+- 先关闭系统里的代理软件（VPN / 加速器 / Clash 等）再运行
+- 或手动指定镜像后重试：
 
 ```powershell
 $env:HF_ENDPOINT = "https://hf-mirror.com"
 .\batchWhisper.ps1 "D:\Movies" ja
 ```
 
-### 3. 提示显存不足（Out of Memory）
+### 3. 模型已下载过，运行时仍卡在联网检查
+
+强制使用本地缓存（不会联网）：
+
+```powershell
+$env:HF_HUB_OFFLINE = "1"
+.\batchWhisper.ps1 "D:\Movies" ja
+```
+
+> 模型首次运行时会自动下载到 `C:\Users\<用户名>\.cache\huggingface`，只下载一次。
+
+### 4. 提示显存不足（Out of Memory）
 
 - 换小一点的模型：`.\batchWhisper.ps1 "D:\Movies" ja large-v3-turbo`
 - 关闭占用显存的程序（如浏览器、游戏）
 - 仍不行则强制用 CPU：`.\batchWhisper.ps1 "D:\Movies" ja large-v3-turbo cpu`
 
-### 4. CPU 电脑跑得太慢
+### 5. CPU 电脑跑得太慢
 
 `large-v3` 在 CPU 上非常慢，建议改用 `small` 模型：
 
@@ -162,7 +177,7 @@ $env:HF_ENDPOINT = "https://hf-mirror.com"
 .\batchWhisper.ps1 "D:\Movies" en small cpu
 ```
 
-### 5. 安装或运行报错，想彻底重来
+### 6. 安装或运行报错，想彻底重来
 
 ```powershell
 Remove-Item -Recurse -Force .venv
