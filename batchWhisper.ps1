@@ -26,6 +26,24 @@ param(
 )
 
 # ----------------------------------------------------------------------------
+# 网络：直连 huggingface.co 常被阻断，报错形如
+#   requests.exceptions.SSLError: [SSL: UNEXPECTED_EOF_WHILE_READING]
+# 系统代理也常导致同样的 SSL 错误。这里默认改用国内镜像，并让 HF 相关域名绕过代理。
+# 如需自定义，运行前先设置 $env:HF_ENDPOINT，脚本就不会改动网络配置。
+# ----------------------------------------------------------------------------
+if (-not $env:HF_ENDPOINT) {
+    $env:HF_ENDPOINT = "https://hf-mirror.com"
+    $hfBypass = "huggingface.co,hf-mirror.com,cdn-lfs.huggingface.co,cdn-lfs.hf.co"
+    if ($env:NO_PROXY) {
+        $env:NO_PROXY = "$hfBypass,$env:NO_PROXY"
+    }
+    else {
+        $env:NO_PROXY = $hfBypass
+    }
+    Write-Host "模型下载: 使用镜像 $env:HF_ENDPOINT（可用 HF_ENDPOINT 覆盖）"
+}
+
+# ----------------------------------------------------------------------------
 # 定位 whisper-ctranslate2 可执行文件（使用仓库自带 .venv）
 # ----------------------------------------------------------------------------
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
