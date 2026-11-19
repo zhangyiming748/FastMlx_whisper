@@ -123,7 +123,7 @@ Write-Host "语言开关 LANG_CODE=$LangCode，已自动选用对应初始提示
 # ----------------------------------------------------------------------------
 # 递归查找 .mp4 / .mkv / .wav
 # ----------------------------------------------------------------------------
-$mediaFiles = Get-ChildItem -Path $TargetDir -Recurse -File -Include "*.mp4", "*.mkv", "*.wav"
+$mediaFiles = Get-ChildItem -Path $TargetDir -Recurse -File -Include "*.mp4", "*.mkv", "*.wav", "*.wmv"
 
 if (-not $mediaFiles) {
     Write-Warning "在 $TargetDir 下未找到 .mp4 / .mkv / .wav 文件"
